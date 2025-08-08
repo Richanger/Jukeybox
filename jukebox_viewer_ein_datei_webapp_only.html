@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Jukebox – Swipe & Flip</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
+  <style>
+    :root { --bg:#1a1a1a; --fg:#fff; --muted:#b5b5b5; --accent:#f0e68c; }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;display:grid;grid-template-rows:auto 1fr;gap:10px;overflow:hidden}
+    header{display:flex;flex-direction:column;align-items:center;gap:12px;padding:14px 10px}
+    header h1{margin:0;font-weight:400;letter-spacing:.5px}
+    #album-info{min-height:1.4rem;color:var(--accent);opacity:0;transition:opacity .25s ease}
+    .jump{display:flex;align-items:center;gap:8px}
+    .jump input{width:90px;text-align:center;background:rgba(255,255,255,.08);color:#fff;border:1px solid var(--accent);border-radius:8px;padding:8px}
+    .jump button{background:var(--accent);color:#1a1a1a;border:0;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer}
+    .swiper{width:90vw;max-width:60vh;aspect-ratio:1/1}
+    @media (max-width:768px){.swiper{width:88vw;max-width:88vw}}
+    .swiper{touch-action:pan-y}
+    .swiper-slide{perspective:1500px;background:transparent;display:grid;place-items:center}
+    .flip-card{width:100%;height:100%}
+    .flip-card-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .6s;box-shadow:0 10px 30px rgba(0,0,0,.5);border-radius:18px;will-change:transform}
+    .flip-card-inner.is-flipped{transform:rotateY(180deg)}
+    .face{position:absolute;inset:0;border-radius:18px;overflow:hidden;background:#000;backface-visibility:hidden}
+    .back{transform:rotateY(180deg)}
+    .face img{width:100%;height:100%;object-fit:cover}
+    .platz{position:absolute;top:14px;left:14px;z-index:2;background:rgba(0,0,0,.6);color:#fff;font-weight:800;font-size:1.2rem;padding:7px 12px;border-radius:12px;user-select:none}
+    .swiper-button-next,.swiper-button-prev{color:var(--accent);--swiper-navigation-size:2.6rem}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Musikbox</h1>
+    <p id="album-info" aria-live="polite"></p>
+    <div class="jump" aria-label="Gehe direkt zu Platz">
+      <input id="jump" type="number" placeholder="Platz…" inputmode="numeric" min="1" max="100" />
+      <button id="go">Los</button>
+    </div>
+  </header>
+
+  <div class="swiper" id="stage" aria-label="Albumkarussell">
+    <div class="swiper-wrapper" id="wrap"></div>
+    <div class="swiper-button-prev" aria-label="Vorheriges"></div>
+    <div class="swiper-button-next" aria-label="Nächstes"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+  <!-- Externe Albumdaten -->
+  <script src="data.js"></script>
+  <script>
+    const MAX_SLOTS = 100;
+    function computeMaps(list){
+      const slotToAlbum = new Array(MAX_SLOTS+1).fill(-1);
+      const albumStartSlot = new Array(list.length).fill(0);
+      let slot = 1;
+      for (let i=0;i<list.length;i++){
+        const d = Math.min(2, Math.max(1, Number(list[i]?.discs||1)));
+        albumStartSlot[i] = slot;
+        for (let j=0;j<d && slot<=MAX_SLOTS;j++) slotToAlbum[slot++] = i;
+      }
+      return { slotToAlbum, albumStartSlot, usedSlots: slot-1 };
+    }
+    (function(){
+      const { slotToAlbum, albumStartSlot, usedSlots } = computeMaps(albums);
+      const wrap = document.getElementById('wrap');
+      const info = document.getElementById('album-info');
+      const jump = document.getElementById('jump');
+      const goBtn = document.getElementById('go');
+      if (!albums.length){ info.textContent = 'Keine Alben konfiguriert'; info.style.opacity = 1; }
+      function albumEnd(i){ const d = Math.min(2, Math.max(1, Number(albums[i]?.discs||1))); return Math.min(MAX_SLOTS, (albumStartSlot[i]||0) + d - 1); }
+      for (let i=0;i<albums.length;i++){
+        const a = albums[i];
+        const s = albumStartSlot[i] || 0;
+        const e = albumEnd(i);
+        const platzLabel = s===e ? `${s}` : `${s}–${e}`;
+        const slide = document.createElement('div');
+        slide.className = 'swiper-slide';
+        slide.dataset.index = i;
+        slide.innerHTML = `
+          <div class="flip-card" role="button" aria-label="Album umdrehen" tabindex="0">
+            <div class="flip-card-inner">
+              <div class="face front">
+                <span class="platz">Platz ${platzLabel}</span>
+                <img src="${a.front}" alt="Cover Platz ${platzLabel}">
+              </div>
+              <div class="face back">
+                <img src="${a.back}" alt="Rückseite Platz ${platzLabel}">
+              </div>
+            </div>
+          </div>`;
+        const card = slide.querySelector('.flip-card');
+        const inner = slide.querySelector('.flip-card-inner');
+        const toggleFlip = (e)=>{ e?.preventDefault?.(); inner.classList.toggle('is-flipped'); };
+        card.addEventListener('click', toggleFlip);
+        card.addEventListener('keydown', (e)=>{ if (e.key===' '||e.key==='Enter') toggleFlip(e); });
+        wrap.appendChild(slide);
+      }
+      const swiper = new Swiper('#stage', {
+        effect: 'cards',
+        grabCursor: true,
+        navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
+        on: {
+          init(){ updateInfo(this); preloadNeighbors(this); },
+          slideChange(){
+            this.slides.forEach(sl => sl.querySelector('.flip-card-inner')?.classList.remove('is-flipped'));
+            updateInfo(this); preloadNeighbors(this);
+          }
+        }
+      });
+      function updateInfo(sw){
+        const s = sw.slides[sw.activeIndex];
+        const i = Number(s?.dataset?.index ?? -1);
+        info.style.opacity = 0;
+        setTimeout(()=>{
+          if (i>=0){
+            const start = albumStartSlot[i];
+            const end = albumEnd(i);
+            info.textContent = start===end ? `Platz ${start}` : `Platz ${start}–${end}`;
+          } else { info.textContent = ''; }
+          info.style.opacity = 1;
+        }, 120);
+      }
+      function preloadNeighbors(sw){
+        const idx = sw.activeIndex;
+        [idx-1, idx, idx+1].forEach(i=>{
+          const sl = sw.slides[i]; if (!sl) return;
+          sl.querySelectorAll('img').forEach(img=>{ const src = img.getAttribute('src'); if (src){ const im = new Image(); im.src = src; } });
+        });
+      }
+      function jumpTo(){
+        const n = parseInt(jump.value, 10);
+        if (!Number.isFinite(n) || n<1 || n>MAX_SLOTS){ flashError(); return; }
+        const pos = slotToAlbum[n];
+        if (pos >= 0){ swiper.slideTo(pos, 600); jump.value=''; jump.style.borderColor=''; }
+        else { flashError(); }
+      }
+      function flashError(){ jump.style.borderColor='red'; setTimeout(()=> jump.style.borderColor='', 900); }
+      goBtn.addEventListener('click', jumpTo);
+      jump.addEventListener('keydown', e=>{ if (e.key==='Enter') jumpTo(); });
+      window.addEventListener('keydown', (e)=>{
+        if (e.key==='ArrowRight') swiper.slideNext();
+        else if (e.key==='ArrowLeft') swiper.slidePrev();
+        else if (e.key==='Home') swiper.slideTo(0);
+        else if (e.key==='End') swiper.slideTo(swiper.slides.length-1);
+      });
+      window.Jukebox = { albums, slotToAlbum, albumStartSlot };
+    })();
+  </script>
+</body>
+</html>
