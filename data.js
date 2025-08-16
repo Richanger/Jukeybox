@@ -9,7 +9,7 @@ const albums = [
   { front: "bilder/8-front.webp", back: "bilder/8-back.webp", discs: 2 },
   { front: "bilder/9-front.webp", back: "bilder/9-back.webp", discs: 1 },
   { front: "bilder/10-front.webp", back: "bilder/10-back.webp", discs: 1 },
-  { front: "bilder/11-front.webp", back: "bilder/11-back.webp", discs: 1 },
+  { front: "bilder/11-front.webp", back : "bilder/11-back.webp", discs: 1 },
   { front: "bilder/12-front.webp", back: "bilder/12-back.webp", discs: 2 },
   { front: "bilder/13-front.webp", back: "bilder/13-back.webp", discs: 2 },
   { front: "bilder/14-front.webp", back: "bilder/14-back.webp", discs: 1 },
