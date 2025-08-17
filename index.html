@@ -19,14 +19,14 @@
     .swiper{width:90vw;max-width:60vh;aspect-ratio:1/1}
     @media (max-width:768px){.swiper{width:88vw;max-width:88vw}}
     .swiper{touch-action:pan-y}
-    .swiper-slide{perspective:1500px;background:transparent;display:grid;place-items:center}
+    .swiper-slide{perspective:1500px;background:transparent;display:grid;place-items:center;will-change:transform;contain:layout paint}
     .flip-card{width:100%;height:100%}
-    .flip-card-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .6s;box-shadow:0 10px 30px rgba(0,0,0,.5);border-radius:18px;will-change:transform}
+    .flip-card-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .5s ease;box-shadow:0 10px 30px rgba(0,0,0,.5);border-radius:18px;will-change:transform;overflow:hidden}
     .flip-card-inner.is-flipped{transform:rotateY(180deg)}
     .face{position:absolute;inset:0;border-radius:18px;overflow:hidden;background:#000;backface-visibility:hidden}
     .back{transform:rotateY(180deg)}
     .face img{width:100%;height:100%;object-fit:cover}
-    .platz{position:absolute;top:14px;left:14px;z-index:2;background:rgba(0,0,0,.6);color:#fff;font-weight:800;font-size:1.2rem;padding:7px 12px;border-radius:12px;user-select:none}
+    .platz{position:absolute;top:14px;left:14px;right:14px;z-index:2;background:rgba(0,0,0,.6);color:#fff;font-weight:800;font-size:1.1rem;padding:6px 10px;border-radius:12px;user-select:none;pointer-events:none;display:inline-block;max-width:unset;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .swiper-button-next,.swiper-button-prev{color:var(--accent);--swiper-navigation-size:2.6rem}
   </style>
 </head>
@@ -68,8 +68,10 @@
       const info = document.getElementById('album-info');
       const jump = document.getElementById('jump');
       const goBtn = document.getElementById('go');
+      let infoTimer;
       if (!albums.length){ info.textContent = 'Keine Alben konfiguriert'; info.style.opacity = 1; }
       function albumEnd(i){ const d = Math.min(2, Math.max(1, Number(albums[i]?.discs||1))); return Math.min(MAX_SLOTS, (albumStartSlot[i]||0) + d - 1); }
+      const frag = document.createDocumentFragment();
       for (let i=0;i<albums.length;i++){
         const a = albums[i];
         const s = albumStartSlot[i] || 0;
@@ -95,16 +97,23 @@
         const toggleFlip = (e)=>{ e?.preventDefault?.(); inner.classList.toggle('is-flipped'); };
         card.addEventListener('click', toggleFlip);
         card.addEventListener('keydown', (e)=>{ if (e.key===' '||e.key==='Enter') toggleFlip(e); });
-        wrap.appendChild(slide);
+        frag.appendChild(slide);
       }
+      wrap.appendChild(frag);
       const swiper = new Swiper('#stage', {
         effect: 'cards',
+        cardsEffect: { slideShadows: false, perSlideRotate: 0 },
+        speed: 380,
+        resistanceRatio: 0.85,
         grabCursor: true,
         navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
         on: {
           init(){ updateInfo(this); preloadNeighbors(this); },
           slideChange(){
-            this.slides.forEach(sl => sl.querySelector('.flip-card-inner')?.classList.remove('is-flipped'));
+            const prev = this.slides?.[this.previousIndex];
+            const act = this.slides?.[this.activeIndex];
+            prev?.querySelector('.flip-card-inner')?.classList.remove('is-flipped');
+            if (this.previousIndex !== this.activeIndex) act?.querySelector('.flip-card-inner')?.classList.remove('is-flipped');
             updateInfo(this); preloadNeighbors(this);
           }
         }
@@ -113,23 +122,34 @@
         const s = sw.slides[sw.activeIndex];
         const i = Number(s?.dataset?.index ?? -1);
         info.style.opacity = 0;
-        setTimeout(()=>{
+        clearTimeout(infoTimer);
+        infoTimer = setTimeout(()=>{
           if (i>=0){
             const start = albumStartSlot[i];
             const end = albumEnd(i);
             info.textContent = start===end ? `Platz ${start}` : `Platz ${start}–${end}`;
           } else { info.textContent = ''; }
           info.style.opacity = 1;
-        }, 120);
-      }
+        }, 90);
+             }
       function preloadNeighbors(sw){
         const idx = sw.activeIndex;
         [idx-1, idx, idx+1].forEach(i=>{
           const sl = sw.slides[i]; if (!sl) return;
-          sl.querySelectorAll('img').forEach(img=>{ const src = img.getAttribute('src'); if (src){ const im = new Image(); im.src = src; } });
+          sl.querySelectorAll('img').forEach(img=>{
+            const src = img.getAttribute('src');
+            if (!src) return;
+            if (!document.querySelector('link[rel="preload"][as="image"][href="'+src+'"]')){
+              const pic = document.createElement('link');
+              pic.rel = 'preload';
+              pic.as = 'image';
+              pic.href = src;
+              document.head.appendChild(pic);
+            }
+          });
         });
       }
-      function jumpTo(){
+        function jumpTo(){
         const n = parseInt(jump.value, 10);
         if (!Number.isFinite(n) || n<1 || n>MAX_SLOTS){ flashError(); return; }
         const pos = slotToAlbum[n];
