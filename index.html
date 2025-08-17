@@ -18,14 +18,14 @@
     .jump button{background:var(--accent);color:#1a1a1a;border:0;border-radius:8px;padding:9px 14px;font-weight:700;cursor:pointer}
     .swiper{width:90vw;max-width:60vh;aspect-ratio:1/1}
     @media (max-width:768px){.swiper{width:88vw;max-width:88vw}}
-    .swiper{touch-action:pan-y}
-    .swiper-slide{background:transparent;display:grid;place-items:center;will-change:transform;contain:layout paint}
-    .flip-card{width:100%;height:100%;perspective:1200px;border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+    .swiper{touch-action:pan-y;overflow:visible}
+    .swiper-slide{background:transparent;display:grid;place-items:center;will-change:transform}
+    .flip-card{width:100%;height:100%;perspective:1200px;border-radius:18px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.5);-webkit-transform:translateZ(0);transform:translateZ(0)}
     .flip-card-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;transition:transform .5s ease;will-change:transform}
-    .flip-card-inner.is-flipped{transform:rotateY(180deg);-webkit-transform:rotateY(180deg)}
+    .flip-card-inner.is-flipped{transform:rotateY(180deg) translateZ(0);-webkit-transform:rotateY(180deg) translateZ(0)}
     .face{position:absolute;inset:0;background:#000;backface-visibility:hidden;-webkit-backface-visibility:hidden}
-    .back{transform:rotateY(180deg);-webkit-transform:rotateY(180deg)}
-    .face img{width:100%;height:100%;object-fit:cover;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+    .back{transform:rotateY(180deg) translateZ(.1px);-webkit-transform:rotateY(180deg) translateZ(.1px)}
+    .face img{width:100%;height:100%;object-fit:cover;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform:translateZ(0);-webkit-transform:translateZ(0)}
 
     .swiper-button-next,.swiper-button-prev{color:var(--accent);--swiper-navigation-size:2.6rem}
   </style>
@@ -50,6 +50,7 @@
   <!-- Externe Albumdaten -->
   <script src="data.js"></script>
   <script>
+    const albums = window.albums || [];
     const MAX_SLOTS = 100;
     function computeMaps(list){
       const slotToAlbum = new Array(MAX_SLOTS+1).fill(-1);
@@ -84,10 +85,16 @@
           <div class="flip-card" role="button" aria-label="Album umdrehen" tabindex="0">
             <div class="flip-card-inner">
               <div class="face front">
-                <img src="${a.front}" alt="Cover Platz ${platzLabel}" loading="lazy" decoding="async">
+                <picture>
+                  <source type="image/webp" srcset="${a.front}">
+                  <img src="${a.front.replace('bilder/','original-images/').replace(/\.webp$/, '.jpg')}" alt="Cover Platz ${platzLabel}" loading="lazy" decoding="async" draggable="false">
+                </picture>
               </div>
               <div class="face back">
-                <img src="${a.back}" alt="Rückseite Platz ${platzLabel}" loading="lazy" decoding="async">
+                <picture>
+                  <source type="image/webp" srcset="${a.back}">
+                  <img src="${a.back.replace('bilder/','original-images/').replace(/\.webp$/, '.jpg')}" alt="Rückseite Platz ${platzLabel}" loading="lazy" decoding="async" draggable="false">
+                </picture>
               </div>
             </div>
           </div>`;
@@ -105,6 +112,8 @@
         speed: 380,
         resistanceRatio: 0.85,
         grabCursor: true,
+        watchSlidesProgress: true,
+        updateOnWindowResize: true,
         navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
         on: {
           init(){ updateInfo(this); preloadNeighbors(this); },
@@ -133,22 +142,39 @@
              }
       function preloadNeighbors(sw){
         const idx = sw.activeIndex;
-        [idx-1, idx, idx+1].forEach(i=>{
+        [idx-2, idx-1, idx, idx+1, idx+2].forEach(i=>{
           const sl = sw.slides[i]; if (!sl) return;
           sl.querySelectorAll('img').forEach(img=>{
-            const src = img.getAttribute('src');
-            if (!src) return;
-            if (!document.querySelector('link[rel="preload"][as="image"][href="'+src+'"]')){
+            const picture = img.closest('picture');
+            const webpSource = picture ? picture.querySelector('source[type="image/webp"]') : null;
+            const chosen = img.currentSrc || (webpSource && webpSource.getAttribute('srcset')) || img.getAttribute('src');
+            if (!chosen) return;
+            img.loading = 'eager';
+            img.decoding = 'async';
+            img.draggable = false;
+            if (i === idx) img.setAttribute('fetchpriority','high'); else img.removeAttribute('fetchpriority');
+            if (img.decode) { img.decode().catch(()=>{}); }
+            if (!img.dataset.fallbackBound){
+              img.addEventListener('error', ()=>{
+                const current = img.currentSrc || '';
+                if (current.endsWith('.webp')){
+                  const jpg = current.replace('bilder/', 'original-images/').replace(/\.webp$/, '.jpg');
+                  img.src = jpg;
+                }
+              }, { once: true });
+              img.dataset.fallbackBound = '1';
+            }
+            if (!document.querySelector('link[rel="preload"][as="image"][href="'+chosen+'"]')){
               const pic = document.createElement('link');
               pic.rel = 'preload';
               pic.as = 'image';
-              pic.href = src;
+              pic.href = chosen;
               document.head.appendChild(pic);
             }
           });
         });
       }
-        function jumpTo(){
+      function jumpTo(){
         const n = parseInt(jump.value, 10);
         if (!Number.isFinite(n) || n<1 || n>MAX_SLOTS){ flashError(); return; }
         const pos = slotToAlbum[n];
