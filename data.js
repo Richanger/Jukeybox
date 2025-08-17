@@ -1,4 +1,4 @@
-const albums = [
+window.albums = [
   { front: "bilder/1-front.webp", back: "bilder/1-back.webp", discs: 1 },
   { front: "bilder/2-front.webp", back: "bilder/2-back.webp", discs: 2 },
   { front: "bilder/3-front.webp", back: "bilder/3-back.webp", discs: 2 },
