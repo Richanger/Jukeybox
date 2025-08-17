@@ -21,11 +21,13 @@
     .swiper{touch-action:pan-y}
     .swiper-slide{perspective:1500px;background:transparent;display:grid;place-items:center;will-change:transform;contain:layout paint}
     .flip-card{width:100%;height:100%}
-    .flip-card-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .5s ease;box-shadow:0 10px 30px rgba(0,0,0,.5);border-radius:18px;will-change:transform;overflow:hidden}
+    .flip-card-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;transition:transform .5s ease;box-shadow:0 10px 30px rgba(0,0,0,.5);border-radius:18px;will-change:transform;overflow:hidden}
     .flip-card-inner.is-flipped{transform:rotateY(180deg)}
-    .face{position:absolute;inset:0;border-radius:18px;overflow:hidden;background:#000;backface-visibility:hidden;-webkit-backface-visibility:hidden}
-    .back{transform:rotateY(180deg)}
-    .face img{width:100%;height:100%;object-fit:cover;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+    .face{position:absolute;inset:0;border-radius:18px;overflow:hidden;background:#000;backface-visibility:hidden;-webkit-backface-visibility:hidden;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;transition:transform .5s ease}
+    .face.front{transform:rotateY(0deg)}
+    .face.back{transform:rotateY(180deg)}
+
+    .face img{width:100%;height:100%;object-fit:cover}
 
     .swiper-button-next,.swiper-button-prev{color:var(--accent);--swiper-navigation-size:2.6rem}
   </style>
@@ -86,7 +88,7 @@
               <div class="face front">
                 <img src="${a.front}" alt="Cover Platz ${platzLabel}" loading="lazy" decoding="async">
               </div>
-              <div class="face back">
+                                             <div class="face back">
                 <img src="${a.back}" alt="Rückseite Platz ${platzLabel}" loading="lazy" decoding="async">
               </div>
             </div>
